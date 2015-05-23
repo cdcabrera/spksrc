@@ -1,105 +1,74 @@
 #!/bin/sh
 
-#########################################
-# A few variables to make things readable
-
-# Package specific variables
+# Package
 PACKAGE="sickbeard"
-DNAME="Sick Beard"
-PYTHON_DIR="/usr/local/python26"
-PYTHON=${PYTHON_DIR}/bin/python
-PYTHON_VAR_DIR="/usr/local/var/python26"
+DNAME="SickBeard"
 
-# Common variables
+# Others
 INSTALL_DIR="/usr/local/${PACKAGE}"
-VAR_DIR="/usr/local/var/${PACKAGE}"
-PATH="${PYTHON_DIR}/bin:/usr/local/bin:/bin:/usr/bin:/usr/syno/bin" # Avoid ipkg commands
+PYTHON_DIR="/usr/local/python"
+PATH="${INSTALL_DIR}/bin:${INSTALL_DIR}/env/bin:${PYTHON_DIR}/bin:/usr/local/bin:/bin:/usr/bin:/usr/syno/bin"
+USER="sickbeard"
+PYTHON="${INSTALL_DIR}/env/bin/python"
+SICKBEARD="${INSTALL_DIR}/share/SickBeard/SickBeard.py"
+CFG_FILE="${INSTALL_DIR}/var/config.ini"
+PID_FILE="${INSTALL_DIR}/var/sickbeard.pid"
+LOG_FILE="${INSTALL_DIR}/var/Logs/sickbeard.log"
 
-RUNAS="${PACKAGE}"
-PROG_PY="${VAR_DIR}/SickBeard.py"
-PID_FILE="${VAR_DIR}/${PACKAGE}.pid"
-LOG_FILE="${VAR_DIR}/Logs/sickbeard.log"
 
 start_daemon ()
 {
-    # Launch the application in the background.
-    su - ${RUNAS} -c "PATH=${PATH} ${PYTHON} ${PROG_PY} --daemon --pidfile ${PID_FILE}"
-    counter=20
-    while [ $counter -gt 0 ]
-    do
-        daemon_status && break
-        let counter=counter-1
-        sleep 1
-    done
-    ln -sf $0 ${PYTHON_VAR_DIR}/run/${PACKAGE}-ctl
+    su - ${USER} -c "PATH=${PATH} ${PYTHON} ${SICKBEARD} --daemon --pidfile ${PID_FILE} --config ${CFG_FILE} --datadir ${INSTALL_DIR}/var/"
 }
 
 stop_daemon ()
 {
-    rm -f ${PYTHON_VAR_DIR}/run/${PACKAGE}-ctl
-	
-    # Kill the application.
     kill `cat ${PID_FILE}`
-
-    # Wait until the application is really dead (may take some time).
-    counter=20
-    while [ ${counter} -gt 0 ]
-    do
-        daemon_status || break
-        let counter=counter-1
-        sleep 1
-    done
+    wait_for_status 1 20 || kill -9 `cat ${PID_FILE}`
+    rm -f ${PID_FILE}
 }
 
 daemon_status ()
 {
-    if [ -f ${PID_FILE} ] 
-    then
-        if [ -d /proc/`cat ${PID_FILE}` ]
-        then
-            return 0
-        else
-            # PID file exists, but no process has this PID. 
-            rm ${PID_FILE}
-        fi
+    if [ -f ${PID_FILE} ] && kill -0 `cat ${PID_FILE}` > /dev/null 2>&1; then
+        return
     fi
+    rm -f ${PID_FILE}
+    return 1
+}
+
+wait_for_status ()
+{
+    counter=$2
+    while [ ${counter} -gt 0 ]; do
+        daemon_status
+        [ $? -eq $1 ] && return
+        let counter=counter-1
+        sleep 1
+    done
     return 1
 }
 
 
-run_in_console ()
-{
-    # Launch the application in the foreground
-    su - ${RUNAS} -c "PATH=${PATH} ${PYTHON} ${PROG_PY}"
-}
-
 case $1 in
     start)
-        if daemon_status
-        then
+        if daemon_status; then
             echo ${DNAME} is already running
-            exit 0
         else
             echo Starting ${DNAME} ...
             start_daemon
-            exit $?
         fi
         ;;
     stop)
-        if daemon_status
-        then
+        if daemon_status; then
             echo Stopping ${DNAME} ...
             stop_daemon
-            exit $?
         else
             echo ${DNAME} is not running
-            exit 0
         fi
         ;;
     status)
-        ${INSTALL_DIR}/sbin/updateInfo
-        if daemon_status
-        then
+        if daemon_status; then
             echo ${DNAME} is running
             exit 0
         else
@@ -107,13 +76,8 @@ case $1 in
             exit 1
         fi
         ;;
-    console)
-        run_in_console
-        exit $?
-        ;;
     log)
         echo ${LOG_FILE}
-        exit 0
         ;;
     *)
         exit 1

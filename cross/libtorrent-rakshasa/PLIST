@@ -1,0 +1,3 @@
+lnk:lib/libtorrent.so
+lnk:lib/libtorrent.so.18
+lib:lib/libtorrent.so.18.0.0

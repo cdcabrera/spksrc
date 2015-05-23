@@ -12,6 +12,8 @@
 PWD := $(shell pwd)
 
 DISTRIB_DIR  = $(PWD)/../../distrib
+PIP_DIR = $(PWD)/../../distrib/pip
+TOOLCHAINS_DIR = $(PWD)/../../distrib/toolchains
 PACKAGES_DIR = $(PWD)/../../packages
 
 ifndef WORK_DIR
@@ -27,6 +29,10 @@ ifndef INSTALL_PREFIX
 INSTALL_PREFIX = /usr/local
 endif
 
+ifndef KERNEL_DIR
+KERNEL_DIR = $(PWD)/../../kernel/syno-$(ARCH)-$(TCVERSION)/work/source/linux
+endif
+
 ifeq ($(strip $(STAGING_INSTALL_PREFIX)),)
 STAGING_INSTALL_PREFIX = $(INSTALL_DIR)$(INSTALL_PREFIX)
 endif
@@ -34,3 +40,4 @@ endif
 define create_target_dir
 @mkdir -p `dirname $@`
 endef
+
